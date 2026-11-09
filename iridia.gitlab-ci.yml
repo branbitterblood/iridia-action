@@ -1,7 +1,7 @@
 # Iridia for GitLab CI. In your .gitlab-ci.yml:
 #
 #   include:
-#     - remote: https://raw.githubusercontent.com/branbitterblood/iridia-action/v0.6.1/iridia.gitlab-ci.yml
+#     - remote: https://raw.githubusercontent.com/branbitterblood/iridia-action/v0.7.1/iridia.gitlab-ci.yml
 #   iridia:
 #     extends: .iridia
 #     variables:
@@ -17,7 +17,7 @@
   variables:
     # The release to run: its iridia-engine-linux-x64, iridia_ci.py and SHA256SUMS.
     # Filled in by the engine's release workflow when it publishes this file.
-    IRIDIA_RELEASE_URL: "https://github.com/branbitterblood/iridia-action/releases/download/v0.6.1"
+    IRIDIA_RELEASE_URL: "https://github.com/branbitterblood/iridia-action/releases/download/v0.7.1"
     IRIDIA_TARGET: ""
     IRIDIA_BASELINE: ""
     IRIDIA_FAIL_ON: "new"
