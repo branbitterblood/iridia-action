@@ -1,0 +1,138 @@
+name: Iridia web security audit
+description: >-
+  Scan a deployed URL (or re-test it against a committed baseline) with Iridia, write SARIF +
+  Executive HTML + scan.json, and fail the job on new (or open) findings at a chosen severity.
+author: Iridia
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  target:
+    description: URL to scan. With `baseline`, defaults to the baseline's own target.
+    required: false
+    default: ""
+  baseline:
+    description: Path to a previous scan.json in the repo to re-test against (needs a Team key).
+    required: false
+    default: ""
+  fail-on:
+    description: "new (default) | open | none"
+    required: false
+    default: new
+  severity:
+    description: "Lowest severity that can fail the job: low | medium | high (default) | critical"
+    required: false
+    default: high
+  passive:
+    description: "true = passive checks only (no authorization needed)"
+    required: false
+    default: "false"
+  scope:
+    description: Authorized scope patterns for active checks, one per line (e.g. *.staging.example.com).
+    required: false
+    default: ""
+  accept-roe:
+    description: "true = you confirm you are authorized to run active checks on `scope`"
+    required: false
+    default: "false"
+  license:
+    description: An Iridia Team license key (pass a secret). Without one the free Community checks run.
+    required: false
+    default: ""
+  out:
+    description: Folder for the reports
+    required: false
+    default: iridia-out
+  artifact-name:
+    description: Name of the uploaded reports artifact ("" = don't upload)
+    required: false
+    default: iridia
+  engine:
+    description: Advanced — an engine command to use instead of the released one.
+    required: false
+    default: ""
+  engine-url:
+    description: >-
+      Advanced — a release URL to download the Linux engine from (checked against its
+      SHA256SUMS). Defaults to the release this action was published with.
+    required: false
+    default: ""
+
+outputs:
+  result:
+    description: pass | fail
+    value: ${{ steps.run.outputs.result }}
+  failing:
+    description: Number of findings that failed the rule
+    value: ${{ steps.run.outputs.failing }}
+  score:
+    description: Posture score 0–100
+    value: ${{ steps.run.outputs.score }}
+  verdict:
+    description: "Re-test verdict when a baseline was given: verified | open | incomplete"
+    value: ${{ steps.run.outputs.verdict }}
+  sarif:
+    description: Path of the SARIF file (for github/codeql-action/upload-sarif)
+    value: ${{ steps.run.outputs.sarif }}
+  baseline:
+    description: Path of this run's scan.json — commit it as the next baseline
+    value: ${{ steps.run.outputs.baseline }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+      with:
+        python-version: "3.12"
+
+    - name: Engine dependencies (only when running from the engine's own repository)
+      shell: bash
+      run: |
+        req="$GITHUB_ACTION_PATH/../../src-tauri/resources/requirements.txt"
+        if [ -f "$req" ]; then python -m pip install --disable-pip-version-check -q -r "$req"; fi
+
+    - name: Run Iridia
+      id: run
+      shell: bash
+      # Inputs reach the script only as environment variables, never spliced into the script
+      # text, so a crafted input can't inject shell.
+      env:
+        IRIDIA_LICENSE: ${{ inputs.license }}
+        IN_TARGET: ${{ inputs.target }}
+        IN_BASELINE: ${{ inputs.baseline }}
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        IN_SEVERITY: ${{ inputs.severity }}
+        IN_PASSIVE: ${{ inputs.passive }}
+        IN_SCOPE: ${{ inputs.scope }}
+        IN_ROE: ${{ inputs.accept-roe }}
+        IN_OUT: ${{ inputs.out }}
+        IN_ENGINE: ${{ inputs.engine }}
+        IN_ENGINE_URL: ${{ inputs.engine-url }}
+        # Filled in by the engine repository's release workflow when it publishes this action:
+        # the release whose iridia-engine-linux-x64 this version of the action runs.
+        IRIDIA_PUBLISHED_ENGINE_URL: "https://github.com/branbitterblood/iridia-action/releases/download/v0.6.1"
+      run: |
+        args=(--fail-on "$IN_FAIL_ON" --severity "$IN_SEVERITY" --out "$IN_OUT")
+        [ -n "$IN_TARGET" ] && args+=(--target "$IN_TARGET")
+        [ -n "$IN_BASELINE" ] && args+=(--baseline "$IN_BASELINE")
+        [ "$IN_PASSIVE" = "true" ] && args+=(--passive)
+        [ "$IN_ROE" = "true" ] && args+=(--accept-roe)
+        [ -n "$IN_ENGINE" ] && args+=(--engine "$IN_ENGINE")
+        url="${IN_ENGINE_URL:-$IRIDIA_PUBLISHED_ENGINE_URL}"
+        [ -z "$IN_ENGINE" ] && [ -n "$url" ] && args+=(--engine-url "$url")
+        while IFS= read -r s; do
+          s="${s//[[:space:]]/}"
+          [ -n "$s" ] && args+=(--scope "$s")
+        done <<< "$IN_SCOPE"
+        runner="$GITHUB_ACTION_PATH/iridia_ci.py"                       # published layout
+        [ -f "$runner" ] || runner="$GITHUB_ACTION_PATH/../iridia_ci.py"  # engine repository
+        python "$runner" "${args[@]}"
+
+    - name: Upload the reports
+      if: always() && inputs.artifact-name != ''
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.out }}
+        if-no-files-found: ignore

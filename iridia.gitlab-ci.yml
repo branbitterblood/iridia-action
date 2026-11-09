@@ -1,0 +1,58 @@
+# Iridia for GitLab CI. In your .gitlab-ci.yml:
+#
+#   include:
+#     - remote: https://raw.githubusercontent.com/branbitterblood/iridia-action/v0.6.1/iridia.gitlab-ci.yml
+#   iridia:
+#     extends: .iridia
+#     variables:
+#       IRIDIA_TARGET: https://staging.example.com
+#       IRIDIA_BASELINE: .iridia/baseline.json     # optional
+#       IRIDIA_SCOPE: "*.staging.example.com"       # optional, space-separated
+#       IRIDIA_ACCEPT_ROE: "true"                   # only for targets you're authorized to test
+#
+# Put the Team key in a masked CI/CD variable named IRIDIA_LICENSE.
+.iridia:
+  image: python:3.12-slim
+  stage: test
+  variables:
+    # The release to run: its iridia-engine-linux-x64, iridia_ci.py and SHA256SUMS.
+    # Filled in by the engine's release workflow when it publishes this file.
+    IRIDIA_RELEASE_URL: "https://github.com/branbitterblood/iridia-action/releases/download/v0.6.1"
+    IRIDIA_TARGET: ""
+    IRIDIA_BASELINE: ""
+    IRIDIA_FAIL_ON: "new"
+    IRIDIA_SEVERITY: "high"
+    IRIDIA_PASSIVE: "false"
+    IRIDIA_SCOPE: ""
+    IRIDIA_ACCEPT_ROE: "false"
+    IRIDIA_OUT: "iridia-out"
+  before_script:
+    # Fetch the runner and check it against the release's SHA256SUMS; the runner then fetches
+    # and checks the engine binary the same way. Nothing runs unverified.
+    - |
+      python - <<'PY'
+      import hashlib, os, urllib.request
+      base = os.environ["IRIDIA_RELEASE_URL"].rstrip("/")
+      assert base.startswith("https://"), "IRIDIA_RELEASE_URL must be an https release URL"
+      get = lambda n: urllib.request.urlopen(f"{base}/{n}", timeout=60).read()
+      sums = dict(reversed(line.split()) for line in get("SHA256SUMS").decode().splitlines() if line.strip())
+      body = get("iridia_ci.py")
+      assert hashlib.sha256(body).hexdigest() == sums["iridia_ci.py"], "iridia_ci.py checksum mismatch"
+      open("/tmp/iridia_ci.py", "wb").write(body)
+      PY
+  script:
+    - |
+      set -- --fail-on "$IRIDIA_FAIL_ON" --severity "$IRIDIA_SEVERITY" --out "$IRIDIA_OUT"
+      [ -n "$IRIDIA_TARGET" ] && set -- "$@" --target "$IRIDIA_TARGET"
+      [ -n "$IRIDIA_BASELINE" ] && set -- "$@" --baseline "$IRIDIA_BASELINE"
+      [ "$IRIDIA_PASSIVE" = "true" ] && set -- "$@" --passive
+      [ "$IRIDIA_ACCEPT_ROE" = "true" ] && set -- "$@" --accept-roe
+      set -f   # scope patterns like *.example.com are not file globs
+      for s in $IRIDIA_SCOPE; do set -- "$@" --scope "$s"; done
+      set +f
+      python /tmp/iridia_ci.py --engine-url "$IRIDIA_RELEASE_URL" "$@"
+  artifacts:
+    when: always
+    paths:
+      - $IRIDIA_OUT/
+    expire_in: 30 days

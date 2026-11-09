@@ -1,0 +1,37 @@
+# .github/workflows/iridia.yml — scan staging after every deploy, fail on new HIGH+ findings,
+# and show them in the repository's Security tab (Code scanning).
+name: Iridia
+on:
+  workflow_run:
+    workflows: ["Deploy staging"]        # your deploy workflow
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write                 # upload SARIF to Code scanning
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4        # needed only for a committed baseline
+
+      - name: Iridia
+        id: iridia
+        uses: branbitterblood/iridia-action@v0.6.1
+        with:
+          target: https://staging.example.com
+          baseline: .iridia/baseline.json   # optional; omit on the first run
+          fail-on: new
+          severity: high
+          scope: "*.staging.example.com"
+          accept-roe: "true"                 # only for targets you're authorized to test
+          license: ${{ secrets.IRIDIA_LICENSE }}
+
+      - name: Show findings in Code scanning
+        if: always() && steps.iridia.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        with:
+          sarif_file: ${{ steps.iridia.outputs.sarif }}
+          category: iridia
