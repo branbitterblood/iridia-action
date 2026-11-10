@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: iridia
-        uses: branbitterblood/iridia-action@v0.7.1
+        uses: branbitterblood/iridia-action@v0.7.2
         with:
           target: https://staging.example.com
           baseline: .iridia/baseline.json      # optional — omit on the first run
@@ -41,7 +41,7 @@ Markdown, scan.json) are uploaded as the `iridia` artifact.
 
 ```yaml
 include:
-  - remote: https://raw.githubusercontent.com/branbitterblood/iridia-action/v0.7.1/iridia.gitlab-ci.yml
+  - remote: https://raw.githubusercontent.com/branbitterblood/iridia-action/v0.7.2/iridia.gitlab-ci.yml
 
 iridia:
   extends: .iridia

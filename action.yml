@@ -111,7 +111,7 @@ runs:
         IN_ENGINE_URL: ${{ inputs.engine-url }}
         # Filled in by the engine repository's release workflow when it publishes this action:
         # the release whose iridia-engine-linux-x64 this version of the action runs.
-        IRIDIA_PUBLISHED_ENGINE_URL: "https://github.com/branbitterblood/iridia-action/releases/download/v0.7.1"
+        IRIDIA_PUBLISHED_ENGINE_URL: "https://github.com/branbitterblood/iridia-action/releases/download/v0.7.2"
       run: |
         args=(--fail-on "$IN_FAIL_ON" --severity "$IN_SEVERITY" --out "$IN_OUT")
         [ -n "$IN_TARGET" ] && args+=(--target "$IN_TARGET")

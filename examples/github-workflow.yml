@@ -19,7 +19,7 @@ jobs:
 
       - name: Iridia
         id: iridia
-        uses: branbitterblood/iridia-action@v0.7.1
+        uses: branbitterblood/iridia-action@v0.7.2
         with:
           target: https://staging.example.com
           baseline: .iridia/baseline.json   # optional; omit on the first run
